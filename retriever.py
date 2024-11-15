@@ -8,7 +8,10 @@ from openai import OpenAI
 # Load environment variables
 load_dotenv()
 PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
-OPENAI_API_KEY = os.getenv('OPENAI_API_KEY')
+OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
+
+if not OPENAI_API_KEY:
+    raise ValueError("OpenAI API Key is missing. Please add it to your .env file or environment variables.")
 
 # Initialize OpenAI client
 client = OpenAI(api_key=OPENAI_API_KEY)
