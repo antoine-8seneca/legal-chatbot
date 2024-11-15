@@ -5,32 +5,47 @@ from langchain_pinecone import PineconeVectorStore
 from langchain_community.embeddings.openai import OpenAIEmbeddings
 from openai import OpenAI
 
-# Load environment variables
+# Load environment variables for Pinecone
 load_dotenv()
 PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
-OPENAI_API_KEY = os.getenv("OPENAI_API_KEY")
-
-if not OPENAI_API_KEY:
-    raise ValueError("OpenAI API Key is missing. Please add it to your .env file or environment variables.")
-
-# Initialize OpenAI client
-client = OpenAI(api_key=OPENAI_API_KEY)
 
 # Initialize Pinecone
 pc = Pinecone(api_key=PINECONE_API_KEY)
 INDEX_NAME = "llm-chatbot-gpt-new"
 
-# Initialize embedding and Pinecone vector store
-embedding = OpenAIEmbeddings(openai_api_key=OPENAI_API_KEY)
-pVS = PineconeVectorStore(index_name=INDEX_NAME, embedding=embedding)
+
+def initialize_retriever(user_openai_api_key: str):
+    """
+    Initializes the embedding and vector store with the user's OpenAI API key.
+
+    Args:
+        user_openai_api_key (str): The user's OpenAI API key.
+
+    Returns:
+        dict: A dictionary containing the embedding and vector store instances.
+    """
+    if not user_openai_api_key:
+        raise ValueError("User-provided OpenAI API Key is missing. Please provide a valid API key.")
+    
+    # Initialize OpenAI embedding with user's API key
+    embedding = OpenAIEmbeddings(openai_api_key=user_openai_api_key)
+    pVS = PineconeVectorStore(index_name=INDEX_NAME, embedding=embedding)
+
+    # Return initialized instances
+    return {
+        "embedding": embedding,
+        "pVS": pVS,
+        "client": OpenAI(api_key=user_openai_api_key)
+    }
 
 
-def expand_query_with_gpt(query: str) -> list:
+def expand_query_with_gpt(query: str, client: OpenAI) -> list:
     """
     Expands a given query using GPT to extract essential legal keywords.
 
     Args:
         query (str): The user's query.
+        client (OpenAI): An instance of the OpenAI client initialized with the user's API key.
 
     Returns:
         list: A list of expanded keywords or phrases.
@@ -65,13 +80,14 @@ def expand_query_with_gpt(query: str) -> list:
         raise RuntimeError(f"Error in query expansion: {e}")
 
 
-def retrieve_documents(query: str, k: int = 3) -> list:
+def retrieve_documents(query: str, k: int, pVS: PineconeVectorStore) -> list:
     """
     Retrieves similar documents from the Pinecone vector store based on a given query.
 
     Args:
         query (str): The query to search in Pinecone.
         k (int): The number of results to retrieve.
+        pVS (PineconeVectorStore): The Pinecone vector store instance.
 
     Returns:
         list: A list of documents retrieved from the Pinecone vector store.
@@ -82,24 +98,30 @@ def retrieve_documents(query: str, k: int = 3) -> list:
         raise RuntimeError(f"Error retrieving documents: {e}")
 
 
-def process_query(query: str, k: int = 3) -> dict:
+def process_query(query: str, user_openai_api_key: str, k: int = 3) -> dict:
     """
     Expands the query, retrieves relevant documents, and returns the results.
 
     Args:
         query (str): The user's query.
+        user_openai_api_key (str): The user's OpenAI API key.
         k (int): The number of results to retrieve.
 
     Returns:
         dict: A dictionary containing expanded keywords and retrieved documents.
     """
     try:
+        # Initialize retriever with the user's OpenAI API key
+        retriever = initialize_retriever(user_openai_api_key)
+        client = retriever["client"]
+        pVS = retriever["pVS"]
+
         # Step 1: Expand the query using GPT
-        expanded_terms = expand_query_with_gpt(query)
+        expanded_terms = expand_query_with_gpt(query, client)
         expanded_query = " ".join(expanded_terms)
 
         # Step 2: Retrieve documents from Pinecone
-        documents = retrieve_documents(expanded_query, k)
+        documents = retrieve_documents(expanded_query, k, pVS)
 
         return {
             "expanded_terms": expanded_terms,
