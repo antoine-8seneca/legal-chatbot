@@ -97,6 +97,7 @@ async def page_1():
     Đây là chatbot giúp người dân tìm hiểu luật hôn nhân và gia đình. Bạn hãy hỏi những câu hỏi có liên quan tới luật này nhé.
     """
 
+    # Display chat history
     for conversation in st.session_state.chat_history:
         st.chat_message("user").write(conversation['question'])
         col1, col2 = st.columns(2)
@@ -105,47 +106,56 @@ async def page_1():
         with col2:
             st.chat_message("assistant").write(conversation['answer2'])
 
+        # Box to display expanded terms
         with st.expander("Expanded Terms"):
             st.write(", ".join(conversation['expanded_terms']))
 
+        # Box to display retrieved contexts
         with st.expander("Retrieved Contexts"):
             for i, doc in enumerate(conversation['retrieved_contexts']):
                 st.write(f"**Context {i + 1}:** {doc.page_content}")
 
         st.write(f"You rated this answer {conversation['stars']} :star:")
 
-    if st.session_state.get("stars"):
-        df = pd.read_csv('result.csv')
-        new_row = {
-            'question': st.session_state['question'],
-            'gpt_answer': st.session_state['msg1'],
-            'enhanced_answer': st.session_state['msg2'],
-            'rating': st.session_state['stars']
-        }
-        df = df._append(new_row, ignore_index=True)
-        df.to_csv('./result.csv', index=False)
-
     if prompt := st.chat_input():
         st.session_state.prompt = prompt
         st.chat_message("user").write(prompt)
+
+        # Get the answers and additional data
         msg1 = await qa1(prompt, client)
         msg2, retrieved_contexts, expanded_terms = await qa2(prompt, st.session_state.openai_apikey)
 
+        # Display the answers
         col1, col2 = st.columns(2)
         with col1:
             st.chat_message("assistant").write(msg1)
         with col2:
             st.chat_message("assistant").write(msg2)
 
-        st.session_state['retrieved_contexts'] = retrieved_contexts
-        st.session_state['expanded_terms'] = expanded_terms
-        st.session_state['question'] = prompt
-        st.session_state['msg1'] = msg1
-        st.session_state['msg2'] = msg2
+        # Display expanded terms and retrieved contexts
+        with st.expander("Expanded Terms"):
+            st.write(", ".join(expanded_terms))
 
-    if "prompt" in st.session_state:
-        st_star_rating("Please rate your experience", maxValue=4, defaultValue=3, key="stars")
+        with st.expander("Retrieved Contexts"):
+            for i, doc in enumerate(retrieved_contexts):
+                st.write(f"**Context {i + 1}:** {doc.page_content}")
 
+        # Save results in session state
+        st.session_state.chat_history.append({
+            'question': prompt,
+            'answer1': msg1,
+            'answer2': msg2,
+            'expanded_terms': expanded_terms,
+            'retrieved_contexts': retrieved_contexts,
+            'stars': None  # Placeholder for rating
+        })
+
+    # Allow the user to rate the last answer
+    if "prompt" in st.session_state and "stars" not in st.session_state:
+        st.session_state.stars = st_star_rating("Please rate your experience", maxValue=4, defaultValue=3)
+
+    if st.session_state.get("stars"):
+        st.session_state.chat_history[-1]['stars'] = st.session_state.stars
 
 async def page_2():
     df = pd.read_csv('result.csv')
