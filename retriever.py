@@ -2,10 +2,17 @@ import os
 from dotenv import load_dotenv
 from pinecone import Pinecone
 from langchain_community.embeddings.openai import OpenAIEmbeddings
+from langchain_pinecone import PineconeVectorStore
 from openai import OpenAI
 
-INDEX_NAME = "llm-chatbot-gpt-new"
 
+INDEX_NAME = "llm-chatbot-gpt-new"
+# Load environment variables for Pinecone
+load_dotenv()
+PINECONE_API_KEY = os.getenv('PINECONE_API_KEY')
+
+# Initialize Pinecone
+pc = Pinecone(api_key=PINECONE_API_KEY)
 
 def initialize_retriever(user_openai_api_key: str):
     """
