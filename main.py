@@ -255,15 +255,24 @@ PAGES = {
 
 def main():
     st.set_page_config(page_title="RAG Chatbot")
+    
+    # Initialize session states
     if "chat_history" not in st.session_state:
         st.session_state.chat_history = []
     if "openai_apikey" not in st.session_state:
         st.session_state.openai_apikey = os.getenv('OPENAI_API_KEY')
-    # asyncio.run(question_answering())
+    
+    # Check if API key is available
+    if not st.session_state.openai_apikey:
+        st.warning("API Key is missing. Please update your API Key.")
+        page_3()  # Redirect to the API Key update page
+        return  # Stop further execution of main()
 
+    # Sidebar navigation
     st.sidebar.title("Navigation")
     choice = st.sidebar.selectbox("Select an option", list(PAGES.keys()))
-    # Call the page function
+    
+    # Call the corresponding page function
     if choice != "Update API KEY":
         asyncio.run(PAGES[choice]())
     else:
